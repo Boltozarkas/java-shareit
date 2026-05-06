@@ -1,95 +1,73 @@
 package ru.practicum.shareit.item;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.mapper.ItemMapper;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.user.User;
-import ru.practicum.shareit.user.UserService;
+import ru.practicum.shareit.user.UserRepository;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
-    private final Map<Long, Item> items = new HashMap<>();
-    private final UserService userService;
-    private long idCounter = 1;
-
-    public ItemServiceImpl(UserService userService) {
-        this.userService = userService;
-    }
+    private final ItemRepository itemRepository;
+    private final UserRepository userRepository;
 
     @Override
     public ItemDto create(Long userId, ItemDto itemDto) {
-        // Проверка обязательных полей
-        if (itemDto.getName() == null || itemDto.getName().isBlank()) {
-            throw new IllegalArgumentException("Name is required");
-        }
-        if (itemDto.getDescription() == null || itemDto.getDescription().isBlank()) {
-            throw new IllegalArgumentException("Description is required");
-        }
-        if (itemDto.getAvailable() == null) {
-            throw new IllegalArgumentException("Available is required");
-        }
-
-        // Проверка существования пользователя
-        try {
-            userService.getById(userId);
-        } catch (NotFoundException e) {
-            throw new NotFoundException("User not found: " + userId);
-        }
-
-        User owner = new User();
-        owner.setId(userId);
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found: " + userId));
 
         Item item = ItemMapper.toItem(itemDto);
-        item.setId(idCounter++);
         item.setOwner(owner);
-        items.put(item.getId(), item);
-        return ItemMapper.toItemDto(item);
+
+        return ItemMapper.toItemDto(itemRepository.save(item));
     }
 
     @Override
     public ItemDto update(Long userId, Long itemId, ItemDto itemDto) {
-        Item existingItem = items.get(itemId);
-        if (existingItem == null) {
-            throw new NotFoundException("Item not found: " + itemId);
-        }
+        Item existingItem = itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
+
         if (!existingItem.getOwner().getId().equals(userId)) {
             throw new NotFoundException("Item not found: " + itemId);
         }
 
         if (itemDto.getName() != null) {
+            if (itemDto.getName().isBlank()) {
+                throw new IllegalArgumentException("Name cannot be blank");
+            }
             existingItem.setName(itemDto.getName());
         }
         if (itemDto.getDescription() != null) {
+            if (itemDto.getDescription().isBlank()) {
+                throw new IllegalArgumentException("Description cannot be blank");
+            }
             existingItem.setDescription(itemDto.getDescription());
         }
         if (itemDto.getAvailable() != null) {
             existingItem.setAvailable(itemDto.getAvailable());
         }
 
-        return ItemMapper.toItemDto(existingItem);
+        return ItemMapper.toItemDto(itemRepository.update(existingItem));
     }
 
     @Override
     public ItemDto getById(Long itemId) {
-        Item item = items.get(itemId);
-        if (item == null) {
-            throw new NotFoundException("Item not found: " + itemId);
-        }
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Item not found: " + itemId));
         return ItemMapper.toItemDto(item);
     }
 
     @Override
     public List<ItemDto> getByOwnerId(Long userId) {
-        return items.values().stream()
-                .filter(item -> item.getOwner().getId().equals(userId))
+        return itemRepository.findByOwnerId(userId).stream()
                 .map(ItemMapper::toItemDto)
                 .collect(Collectors.toList());
     }
@@ -99,12 +77,7 @@ public class ItemServiceImpl implements ItemService {
         if (text == null || text.isBlank()) {
             return Collections.emptyList();
         }
-        String lowerText = text.toLowerCase();
-        return items.values().stream()
-                .filter(item -> Boolean.TRUE.equals(item.getAvailable()))
-                .filter(item ->
-                        (item.getName() != null && item.getName().toLowerCase().contains(lowerText)) ||
-                                (item.getDescription() != null && item.getDescription().toLowerCase().contains(lowerText)))
+        return itemRepository.search(text).stream()
                 .map(ItemMapper::toItemDto)
                 .collect(Collectors.toList());
     }

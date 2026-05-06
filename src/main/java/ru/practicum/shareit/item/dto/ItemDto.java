@@ -6,9 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * TODO Sprint add-controllers.
- */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -21,7 +18,7 @@ public class ItemDto {
     @NotBlank(message = "Description is required")
     private String description;
 
-    @NotNull(message = "Available status is required")
+    @NotNull(message = "Available is required")
     private Boolean available;
 
     private Long requestId;
