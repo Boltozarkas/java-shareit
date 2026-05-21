@@ -6,6 +6,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ErrorHandler {
@@ -27,6 +28,25 @@ public class ErrorHandler {
         String message;
         if (e instanceof MethodArgumentNotValidException ex) {
             message = ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        } else {
+            message = e.getMessage();
+        }
+
+        // Определяем статус по сообщению
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        if (message != null && message.contains("owner")) {
+            status = HttpStatus.FORBIDDEN; // 403 для случаев с владельцем
+        }
+
+        return ResponseEntity.status(status)
+                .body(new ErrorResponse(message));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String message;
+        if (e.getRequiredType() != null && e.getRequiredType().getEnumConstants() != null) {
+            message = "Unknown state: " + e.getValue();
         } else {
             message = e.getMessage();
         }

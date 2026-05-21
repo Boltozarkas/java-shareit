@@ -22,4 +22,9 @@ public class ItemDto {
     private Boolean available;
 
     private Long requestId;
+
+    public ItemDto(Long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
 }
