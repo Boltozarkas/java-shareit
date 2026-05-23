@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    // Для booker
+    // Существующие методы для booker
     List<Booking> findByBookerId(Long bookerId, Sort sort);
 
     List<Booking> findByBookerIdAndEndBefore(Long bookerId, LocalDateTime end, Sort sort);
@@ -20,7 +20,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByBookerIdAndStatus(Long bookerId, BookingStatus status, Sort sort);
 
-    // Для owner
+    // Существующие методы для owner
     List<Booking> findByItemOwnerId(Long ownerId, Sort sort);
 
     List<Booking> findByItemOwnerIdAndEndBefore(Long ownerId, LocalDateTime end, Sort sort);
@@ -35,8 +35,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("select b from Booking b where b.item.id = :itemId and b.booker.id = :userId and b.status = 'APPROVED' and b.end < :now")
     List<Booking> findCompletedBookingsByItemAndUser(Long itemId, Long userId, LocalDateTime now);
 
-    // Для получения дат бронирования
+    // Для одного предмета
     Optional<Booking> findFirstByItemIdAndEndBeforeAndStatusOrderByEndDesc(Long itemId, LocalDateTime now, BookingStatus status);
 
     Optional<Booking> findFirstByItemIdAndStartAfterAndStatusOrderByStartAsc(Long itemId, LocalDateTime now, BookingStatus status);
+
+    // Новые методы для пакетной загрузки
+    @Query("select b from Booking b where b.item.id in :itemIds and b.status = :status")
+    List<Booking> findByItemIdInAndStatus(List<Long> itemIds, BookingStatus status);
+
+    List<Booking> findByItemIdInAndStatusAndEndBeforeOrderByEndDesc(List<Long> itemIds, BookingStatus status, LocalDateTime now);
+
+    List<Booking> findByItemIdInAndStatusAndStartAfterOrderByStartAsc(List<Long> itemIds, BookingStatus status, LocalDateTime now);
 }

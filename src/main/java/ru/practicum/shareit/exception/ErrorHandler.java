@@ -17,6 +17,12 @@ public class ErrorHandler {
                 .body(new ErrorResponse(e.getMessage()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse(e.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateEmail(DuplicateEmailException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -31,14 +37,7 @@ public class ErrorHandler {
         } else {
             message = e.getMessage();
         }
-
-        // Определяем статус по сообщению
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-        if (message != null && message.contains("owner")) {
-            status = HttpStatus.FORBIDDEN; // 403 для случаев с владельцем
-        }
-
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(message));
     }
 
