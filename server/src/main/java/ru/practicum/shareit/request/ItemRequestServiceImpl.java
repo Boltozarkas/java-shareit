@@ -8,13 +8,15 @@ import ru.practicum.shareit.exception.NotFoundException;
 import ru.practicum.shareit.item.ItemRepository;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.mapper.ItemMapper;
+import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.request.dto.ItemRequestCreateDto;
 import ru.practicum.shareit.request.dto.ItemRequestDto;
 import ru.practicum.shareit.request.mapper.ItemRequestMapper;
 import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.UserRepository;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +36,8 @@ public class ItemRequestServiceImpl implements ItemRequestService {
         itemRequest.setDescription(dto.getDescription());
         itemRequest.setRequestor(requestor);
 
-        return ItemRequestMapper.toItemRequestDto(itemRequestRepository.save(itemRequest), List.of());
+        ItemRequest saved = itemRequestRepository.save(itemRequest);
+        return ItemRequestMapper.toItemRequestDto(saved, Collections.emptyList());
     }
 
     @Override
@@ -43,16 +46,10 @@ public class ItemRequestServiceImpl implements ItemRequestService {
             throw new NotFoundException("User not found: " + userId);
         }
 
-        return itemRequestRepository.findByRequestorId(userId, Sort.by(Sort.Direction.DESC, "created"))
-                .stream()
-                .map(request -> {
-                    List<ItemDto> items = itemRepository.findByRequestId(request.getId())
-                            .stream()
-                            .map(ItemMapper::toItemDto)
-                            .toList();
-                    return ItemRequestMapper.toItemRequestDto(request, items);
-                })
-                .toList();
+        List<ItemRequest> requests = itemRequestRepository.findByRequestorId(
+                userId, Sort.by(Sort.Direction.DESC, "created"));
+
+        return toItemRequestDtoList(requests);
     }
 
     @Override
@@ -61,16 +58,10 @@ public class ItemRequestServiceImpl implements ItemRequestService {
             throw new NotFoundException("User not found: " + userId);
         }
 
-        return itemRequestRepository.findByRequestorIdNot(userId, Sort.by(Sort.Direction.DESC, "created"))
-                .stream()
-                .map(request -> {
-                    List<ItemDto> items = itemRepository.findByRequestId(request.getId())
-                            .stream()
-                            .map(ItemMapper::toItemDto)
-                            .toList();
-                    return ItemRequestMapper.toItemRequestDto(request, items);
-                })
-                .toList();
+        List<ItemRequest> requests = itemRequestRepository.findByRequestorIdNot(
+                userId, Sort.by(Sort.Direction.DESC, "created"));
+
+        return toItemRequestDtoList(requests);
     }
 
     @Override
@@ -82,11 +73,41 @@ public class ItemRequestServiceImpl implements ItemRequestService {
         ItemRequest request = itemRequestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
 
-        List<ItemDto> items = itemRepository.findByRequestId(requestId)
-                .stream()
+        List<Item> items = itemRepository.findByRequestId(requestId);
+        List<ItemDto> itemDtos = items.stream()
                 .map(ItemMapper::toItemDto)
-                .toList();
+                .collect(Collectors.toList());
 
-        return ItemRequestMapper.toItemRequestDto(request, items);
+        return ItemRequestMapper.toItemRequestDto(request, itemDtos);
+    }
+
+    private List<ItemRequestDto> toItemRequestDtoList(List<ItemRequest> requests) {
+        if (requests.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Собираем все ID запросов
+        Set<Long> requestIds = requests.stream()
+                .map(ItemRequest::getId)
+                .collect(Collectors.toSet());
+
+        // Загружаем все вещи для всех запросов одним запросом
+        List<Item> allItems = itemRepository.findByRequestIdIn(new ArrayList<>(requestIds));
+
+        // Группируем вещи по ID запроса
+        Map<Long, List<ItemDto>> itemsByRequestId = allItems.stream()
+                .collect(Collectors.groupingBy(
+                        Item::getRequestId,
+                        Collectors.mapping(ItemMapper::toItemDto, Collectors.toList())
+                ));
+
+        // Формируем DTO для каждого запроса
+        return requests.stream()
+                .map(request -> {
+                    List<ItemDto> items = itemsByRequestId.getOrDefault(
+                            request.getId(), Collections.emptyList());
+                    return ItemRequestMapper.toItemRequestDto(request, items);
+                })
+                .collect(Collectors.toList());
     }
 }

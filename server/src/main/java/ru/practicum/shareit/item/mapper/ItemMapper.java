@@ -40,8 +40,10 @@ public class ItemMapper {
         return item;
     }
 
-    public ItemResponseDto toItemResponseDto(Item item, List<CommentDto> comments,
-                                             BookingInfo lastBooking, BookingInfo nextBooking) {
+    public ItemResponseDto toItemResponseDto(Item item,
+                                             List<CommentDto> comments,
+                                             BookingInfo lastBooking,
+                                             BookingInfo nextBooking) {
         ItemResponseDto dto = new ItemResponseDto();
         dto.setId(item.getId());
         dto.setName(item.getName());
@@ -67,7 +69,9 @@ public class ItemMapper {
     }
 
     public BookingInfo toBookingInfo(Booking booking) {
-        if (booking == null) return null;
+        if (booking == null) {
+            return null;
+        }
         return new BookingInfo(
                 booking.getId(),
                 booking.getBooker().getId(),
@@ -77,12 +81,18 @@ public class ItemMapper {
     }
 
     public List<CommentDto> toCommentDtoList(List<Comment> comments) {
-        if (comments == null) return Collections.emptyList();
-        return comments.stream().map(ItemMapper::toCommentDto).collect(Collectors.toList());
+        if (comments == null) {
+            return Collections.emptyList();
+        }
+        return comments.stream()
+                .map(ItemMapper::toCommentDto)
+                .collect(Collectors.toList());
     }
 
     public Map<Long, List<CommentDto>> groupCommentsByItemId(List<Comment> comments) {
-        if (comments == null || comments.isEmpty()) return Collections.emptyMap();
+        if (comments == null || comments.isEmpty()) {
+            return Collections.emptyMap();
+        }
         return comments.stream()
                 .collect(Collectors.groupingBy(
                         comment -> comment.getItem().getId(),
@@ -91,7 +101,9 @@ public class ItemMapper {
     }
 
     public Map<Long, BookingInfo> findLastBookings(List<Booking> bookings, LocalDateTime now) {
-        if (bookings == null || bookings.isEmpty()) return Collections.emptyMap();
+        if (bookings == null || bookings.isEmpty()) {
+            return Collections.emptyMap();
+        }
         return bookings.stream()
                 .filter(b -> b.getEnd().isBefore(now))
                 .collect(Collectors.groupingBy(
@@ -104,7 +116,9 @@ public class ItemMapper {
     }
 
     public Map<Long, BookingInfo> findNextBookings(List<Booking> bookings, LocalDateTime now) {
-        if (bookings == null || bookings.isEmpty()) return Collections.emptyMap();
+        if (bookings == null || bookings.isEmpty()) {
+            return Collections.emptyMap();
+        }
         return bookings.stream()
                 .filter(b -> b.getStart().isAfter(now))
                 .collect(Collectors.groupingBy(

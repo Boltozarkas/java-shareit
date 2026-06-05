@@ -21,9 +21,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ItemRequestServiceImplTest {
@@ -42,7 +41,7 @@ class ItemRequestServiceImplTest {
 
     private User user;
     private ItemRequest itemRequest;
-    private ItemRequestDto itemRequestDto;
+    private Item item;
 
     @BeforeEach
     void setUp() {
@@ -57,10 +56,12 @@ class ItemRequestServiceImplTest {
         itemRequest.setRequestor(user);
         itemRequest.setCreated(LocalDateTime.now());
 
-        itemRequestDto = new ItemRequestDto();
-        itemRequestDto.setId(1L);
-        itemRequestDto.setDescription("Need a drill");
-        itemRequestDto.setCreated(LocalDateTime.now());
+        item = new Item();
+        item.setId(1L);
+        item.setName("Drill");
+        item.setDescription("Electric drill");
+        item.setAvailable(true);
+        item.setRequestId(1L);
     }
 
     @Test
@@ -88,12 +89,25 @@ class ItemRequestServiceImplTest {
         when(userRepository.existsById(anyLong())).thenReturn(true);
         when(itemRequestRepository.findByRequestorId(anyLong(), any(Sort.class)))
                 .thenReturn(List.of(itemRequest));
-        when(itemRepository.findByRequestId(anyLong())).thenReturn(Collections.emptyList());
+        when(itemRepository.findByRequestIdIn(anyList())).thenReturn(List.of(item));
 
         List<ItemRequestDto> result = itemRequestService.getByUserId(1L);
 
         assertEquals(1, result.size());
         assertEquals("Need a drill", result.get(0).getDescription());
+        assertEquals(1, result.get(0).getItems().size());
+    }
+
+    @Test
+    void getByUserId_WithNoRequests_ShouldReturnEmptyList() {
+        when(userRepository.existsById(anyLong())).thenReturn(true);
+        when(itemRequestRepository.findByRequestorId(anyLong(), any(Sort.class)))
+                .thenReturn(Collections.emptyList());
+
+        List<ItemRequestDto> result = itemRequestService.getByUserId(1L);
+
+        assertTrue(result.isEmpty());
+        verify(itemRepository, never()).findByRequestIdIn(anyList());
     }
 
     @Test
@@ -108,24 +122,30 @@ class ItemRequestServiceImplTest {
         when(userRepository.existsById(anyLong())).thenReturn(true);
         when(itemRequestRepository.findByRequestorIdNot(anyLong(), any(Sort.class)))
                 .thenReturn(List.of(itemRequest));
-        when(itemRepository.findByRequestId(anyLong())).thenReturn(Collections.emptyList());
+        when(itemRepository.findByRequestIdIn(anyList())).thenReturn(List.of(item));
 
         List<ItemRequestDto> result = itemRequestService.getAllExceptUser(2L);
 
         assertEquals(1, result.size());
+        assertEquals(1, result.get(0).getItems().size());
+    }
+
+    @Test
+    void getAllExceptUser_WithNoRequests_ShouldReturnEmptyList() {
+        when(userRepository.existsById(anyLong())).thenReturn(true);
+        when(itemRequestRepository.findByRequestorIdNot(anyLong(), any(Sort.class)))
+                .thenReturn(Collections.emptyList());
+
+        List<ItemRequestDto> result = itemRequestService.getAllExceptUser(2L);
+
+        assertTrue(result.isEmpty());
+        verify(itemRepository, never()).findByRequestIdIn(anyList());
     }
 
     @Test
     void getById_ShouldReturnRequestWithItems() {
         when(userRepository.existsById(anyLong())).thenReturn(true);
         when(itemRequestRepository.findById(anyLong())).thenReturn(Optional.of(itemRequest));
-
-        Item item = new Item();
-        item.setId(1L);
-        item.setName("Drill");
-        item.setDescription("Electric drill");
-        item.setAvailable(true);
-
         when(itemRepository.findByRequestId(anyLong())).thenReturn(List.of(item));
 
         ItemRequestDto result = itemRequestService.getById(1L, 1L);
@@ -134,6 +154,25 @@ class ItemRequestServiceImplTest {
         assertEquals("Need a drill", result.getDescription());
         assertEquals(1, result.getItems().size());
         assertEquals("Drill", result.getItems().get(0).getName());
+    }
+
+    @Test
+    void getById_WithNoItems_ShouldReturnRequestWithEmptyItems() {
+        when(userRepository.existsById(anyLong())).thenReturn(true);
+        when(itemRequestRepository.findById(anyLong())).thenReturn(Optional.of(itemRequest));
+        when(itemRepository.findByRequestId(anyLong())).thenReturn(Collections.emptyList());
+
+        ItemRequestDto result = itemRequestService.getById(1L, 1L);
+
+        assertNotNull(result);
+        assertTrue(result.getItems().isEmpty());
+    }
+
+    @Test
+    void getById_WithNonExistentUser_ShouldThrowException() {
+        when(userRepository.existsById(anyLong())).thenReturn(false);
+
+        assertThrows(NotFoundException.class, () -> itemRequestService.getById(1L, 999L));
     }
 
     @Test

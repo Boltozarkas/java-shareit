@@ -19,9 +19,8 @@ import ru.practicum.shareit.user.User;
 import ru.practicum.shareit.user.UserRepository;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -99,25 +98,45 @@ public class ItemServiceImpl implements ItemService {
         }
 
         List<Item> items = itemRepository.findByOwnerId(userId);
-        if (items.isEmpty()) return Collections.emptyList();
+        if (items.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        List<Long> itemIds = items.stream().map(Item::getId).toList();
-        Map<Long, List<CommentDto>> commentsByItemId = ItemMapper.groupCommentsByItemId(
-                commentRepository.findByItemIdIn(itemIds));
+        Set<Long> itemIds = items.stream()
+                .map(Item::getId)
+                .collect(Collectors.toSet());
+
+        Map<Long, List<CommentDto>> commentsByItemId = getCommentsByItemIds(itemIds);
 
         LocalDateTime now = LocalDateTime.now();
-        List<Booking> approvedBookings = bookingRepository.findByItemIdInAndStatus(itemIds, BookingStatus.APPROVED);
-        Map<Long, BookingInfo> lastBookings = ItemMapper.findLastBookings(approvedBookings, now);
-        Map<Long, BookingInfo> nextBookings = ItemMapper.findNextBookings(approvedBookings, now);
+        Map<Long, BookingInfo> lastBookings = getLastBookingsForItems(itemIds, now);
+        Map<Long, BookingInfo> nextBookings = getNextBookingsForItems(itemIds, now);
 
         return items.stream()
-                .map(item -> ItemMapper.toItemResponseDto(
-                        item,
-                        commentsByItemId.getOrDefault(item.getId(), Collections.emptyList()),
-                        lastBookings.get(item.getId()),
-                        nextBookings.get(item.getId())
-                ))
-                .toList();
+                .map(item -> {
+                    List<CommentDto> comments = commentsByItemId.getOrDefault(item.getId(), Collections.emptyList());
+                    BookingInfo lastBooking = lastBookings.get(item.getId());
+                    BookingInfo nextBooking = nextBookings.get(item.getId());
+                    return ItemMapper.toItemResponseDto(item, comments, lastBooking, nextBooking);
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Map<Long, List<CommentDto>> getCommentsByItemIds(Set<Long> itemIds) {
+        List<Comment> comments = commentRepository.findByItemIdIn(new ArrayList<>(itemIds));
+        return ItemMapper.groupCommentsByItemId(comments);
+    }
+
+    private Map<Long, BookingInfo> getLastBookingsForItems(Set<Long> itemIds, LocalDateTime now) {
+        List<Booking> bookings = bookingRepository
+                .findByItemIdInAndStatus(new ArrayList<>(itemIds), BookingStatus.APPROVED);
+        return ItemMapper.findLastBookings(bookings, now);
+    }
+
+    private Map<Long, BookingInfo> getNextBookingsForItems(Set<Long> itemIds, LocalDateTime now) {
+        List<Booking> bookings = bookingRepository
+                .findByItemIdInAndStatus(new ArrayList<>(itemIds), BookingStatus.APPROVED);
+        return ItemMapper.findNextBookings(bookings, now);
     }
 
     @Override
